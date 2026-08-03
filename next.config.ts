@@ -1,15 +1,14 @@
 import type { NextConfig } from "next";
 
+const basePath = process.env.BASE_PATH?.replace(/\/$/, "") || "";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  async redirects() {
-    return [
-      { source: "/android", destination: "/builds", permanent: true },
-      { source: "/desktop", destination: "/builds", permanent: true },
-      { source: "/protocol", destination: "/builds", permanent: true },
-      { source: "/nullsec", destination: "/us", permanent: true },
-    ];
-  },
+  output: "export",
+  trailingSlash: true,
+  images: { unoptimized: true },
+  basePath: basePath || undefined,
+  assetPrefix: basePath || undefined,
 };
 
 export default nextConfig;

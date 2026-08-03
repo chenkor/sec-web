@@ -15,6 +15,7 @@ export type SecLiveData = {
 type GhRelease = {
   tag_name?: string;
   published_at?: string;
+  draft?: boolean;
   assets?: Array<{
     name?: string;
     size?: number;
@@ -40,23 +41,19 @@ function pickApk(release: GhRelease) {
 }
 
 export async function fetchSecLiveData(): Promise<SecLiveData> {
-  const headers = {
+  const headers: HeadersInit = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "sec-web",
   };
 
   const [releaseRes, repoRes] = await Promise.all([
     // /releases/latest ignores prereleases; SEC ships betas as prerelease.
     fetch(
       "https://api.github.com/repos/chenkor/sec-android/releases?per_page=10",
-      {
-        headers,
-        next: { revalidate: 60 },
-      },
+      { headers, cache: "no-store" },
     ),
     fetch("https://api.github.com/repos/chenkor/sec-android", {
       headers,
-      next: { revalidate: 60 },
+      cache: "no-store",
     }),
   ]);
 
@@ -67,9 +64,7 @@ export async function fetchSecLiveData(): Promise<SecLiveData> {
     throw new Error(`GitHub repo HTTP ${repoRes.status}`);
   }
 
-  const releases = (await releaseRes.json()) as Array<
-    GhRelease & { draft?: boolean; prerelease?: boolean }
-  >;
+  const releases = (await releaseRes.json()) as GhRelease[];
   const release =
     releases.find((r) => !r.draft && pickApk(r)) ??
     releases.find((r) => !r.draft) ??

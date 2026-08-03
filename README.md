@@ -23,6 +23,8 @@ Marketing site for **SEC**: private Nostr messaging with a local vault. English 
 
 Live release data (version, APK download URL, size, stars, and related stats) is loaded from the [sec-android GitHub Releases](https://github.com/chenkor/sec-android/releases) API.
 
+Site: [chenkor.github.io/sec-web](https://chenkor.github.io/sec-web/)
+
 ## Pages
 
 | Route | Content |
@@ -38,7 +40,8 @@ Live release data (version, APK download URL, size, stars, and related stats) is
 - Next.js (App Router)
 - TypeScript
 - Tailwind CSS
-- GitHub API (`/api/sec`) for live Android release metadata
+- GitHub API (client-side) for live Android release metadata
+- Static export for GitHub Pages
 
 ## Prerequisites
 
@@ -58,8 +61,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 npm run build
-npm start
 ```
+
+Output is written to `out/` (static export).
+
+GitHub Pages builds with `BASE_PATH=/sec-web` via [.github/workflows/deploy.yml](./.github/workflows/deploy.yml).
 
 ## Related
 

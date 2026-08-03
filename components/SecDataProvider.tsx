@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { SecLiveData } from "@/lib/github";
+import { fetchSecLiveData, type SecLiveData } from "@/lib/github";
 import { SITE } from "@/lib/site";
 
 type SecState = {
@@ -45,9 +45,7 @@ export function SecDataProvider({ children }: { children: ReactNode }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/sec", { cache: "no-store" });
-      if (!res.ok) throw new Error(`Live data HTTP ${res.status}`);
-      const json = (await res.json()) as SecLiveData;
+      const json = await fetchSecLiveData();
       setData(json);
       setError(null);
     } catch (err) {
