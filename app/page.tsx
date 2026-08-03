@@ -33,8 +33,8 @@ export default function HomePage() {
       <div>
         <h1 className="display home__title">SEC</h1>
         <p className="lede mt-7">
-          A private Nostr messenger with a local vault. Built for Nullsec, and
-          for anyone who needs a channel away from the usual platforms.
+          A private messenger with a local vault. Built for Nullsec, and for
+          anyone who needs a channel away from the usual platforms.
         </p>
         <div className="btn-row !mt-8 !pt-0">
           <a href={apkUrl} className="btn btn-primary">

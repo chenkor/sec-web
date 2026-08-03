@@ -25,15 +25,34 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://chenkor.github.io/sec-web"),
   title: {
     default: "SEC",
     template: "%s - SEC",
   },
-  description: SITE.tagline,
+  description: SITE.description,
+  applicationName: "SEC",
+  keywords: [
+    "SEC",
+    "private messaging",
+    "encrypted chat",
+    "local vault",
+    "Android",
+    "Tor",
+    "Nullsec",
+  ],
   openGraph: {
     title: "SEC",
-    description: SITE.tagline,
+    description: SITE.description,
+    url: "/",
+    siteName: "SEC",
+    locale: "en_US",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SEC",
+    description: SITE.description,
   },
 };
 

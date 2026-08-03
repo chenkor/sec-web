@@ -2,7 +2,7 @@
 
 # SEC Web
 
-Private Nostr messaging - project site for SEC.
+Private messaging with a local vault - project site for SEC.
 
 [![Stars](https://img.shields.io/github/stars/chenkor/sec-web)](https://github.com/chenkor/sec-web/stargazers)
 [![Forks](https://img.shields.io/github/forks/chenkor/sec-web)](https://github.com/chenkor/sec-web/network/members)
@@ -19,7 +19,7 @@ Private Nostr messaging - project site for SEC.
 
 ---
 
-Marketing site for **SEC**: private Nostr messaging with a local vault. English UI. Android is the primary product surface. Desktop is listed as under development.
+Marketing site for **SEC**: private messaging with a local vault. English UI. Android is the primary product surface. Desktop is listed as under development.
 
 Live release data (version, APK download URL, size, stars, and related stats) is loaded from the [sec-android GitHub Releases](https://github.com/chenkor/sec-android/releases) API.
 

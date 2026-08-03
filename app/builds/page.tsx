@@ -12,15 +12,15 @@ const features = [
   },
   {
     title: "Private DMs",
-    body: "One-to-one chats with NIP-44 encryption and gift-wrap so less of the conversation shape leaks.",
+    body: "One-to-one chats with end-to-end encryption that hides more than just the message text.",
   },
   {
     title: "Invite channels",
     body: "Private rooms you join by invite only. Create, invite, accept, or refuse.",
   },
   {
-    title: "Embedded Tor",
-    body: "Tor ships with the app. You can run tor-only if you want every hop through it.",
+    title: "Built-in Tor",
+    body: "Tor ships inside the app. Flip tor-only when you want every hop through the network.",
   },
   {
     title: "Bluetooth mesh",
@@ -28,7 +28,7 @@ const features = [
   },
   {
     title: "Contacts",
-    body: "Add people with a SEC QR or an npub. Use disposable identities when a circle shouldn't share the same key.",
+    body: "Add people with a SEC QR or a public key. Use disposable identities when a circle shouldn't share the same key.",
   },
 ];
 

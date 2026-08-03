@@ -1,7 +1,9 @@
 export const SITE = {
   name: "SEC",
   packageId: "com.sec.vault",
-  tagline: "Private Nostr messaging with a local vault.",
+  tagline: "Private messaging with a local vault.",
+  description:
+    "Private messaging with a local vault. Android-first, keys on your device, optional Tor.",
   androidRepo: "https://github.com/chenkor/sec-android",
   androidReleases: "https://github.com/chenkor/sec-android/releases",
   desktopRepo: "https://github.com/chenkor/sec-desktop",
