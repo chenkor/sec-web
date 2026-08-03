@@ -1,3 +1,4 @@
+import { NetworkDiagram } from "@/components/network/NetworkDiagram";
 import { PageHeader } from "@/components/PageHeader";
 
 const posture = [
@@ -28,7 +29,9 @@ export default function SecurityPage() {
         lead="SEC is for private messaging when you don't want a platform account in the middle. Local keys, optional Tor, Bluetooth when the network is gone."
       />
 
-      <div className="grid gap-x-10 md:grid-cols-2">
+      <NetworkDiagram />
+
+      <div className="mt-16 grid gap-x-10 md:grid-cols-2">
         {posture.map((item) => (
           <article key={item.title} className="panel">
             <h2 className="panel-title text-[1.15rem]">{item.title}</h2>
@@ -39,9 +42,10 @@ export default function SecurityPage() {
 
       <div className="panel mt-4 max-w-3xl">
         <p className="panel-body !mt-0">
-          SEC won't make you invisible to a global adversary. What it does give
-          you is encrypted messaging with keys you hold, Tor if you want it, and
-          a Bluetooth fallback when IP is dead.
+          Your keys never leave the device. Messages stay sealed end to end.
+          Force Tor when you need the path hidden, pin relays with TOFU, and
+          keep talking over Bluetooth when IP is dead. No platform account in
+          the middle — privacy by possession, not by promise.
         </p>
       </div>
     </div>

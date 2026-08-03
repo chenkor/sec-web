@@ -181,11 +181,19 @@ export function formatBytes(bytes: number): string {
   return `${mb.toFixed(mb >= 100 ? 0 : 2)} MB`;
 }
 
-export function formatUtcClock(date: Date): string {
-  const hh = String(date.getUTCHours()).padStart(2, "0");
-  const mm = String(date.getUTCMinutes()).padStart(2, "0");
-  const ss = String(date.getUTCSeconds()).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
+const berlinClock = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Berlin",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+export function formatBerlinClock(date: Date): string {
+  const parts = berlinClock.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
 export function formatRelative(fromIso: string, nowMs: number): string {

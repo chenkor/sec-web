@@ -47,7 +47,7 @@ export default function HomePage() {
       </div>
 
       <aside className="home__aside" aria-label="Live release and time">
-        <Row label="UTC">
+        <Row label="Berlin">
           <LiveClock />
         </Row>
         <Row label="Version">
