@@ -5,8 +5,9 @@
   "description": "SEC project website (Next.js). Android-focused.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/generate-og.mjs",
+    "prebuild": "node scripts/fetch-release.mjs && node scripts/generate-og.mjs",
     "build": "next build",
+    "fetch-release": "node scripts/fetch-release.mjs",
     "og": "node scripts/generate-og.mjs",
     "lint": "next lint"
   },

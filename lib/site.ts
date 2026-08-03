@@ -7,11 +7,18 @@ export const SITE = {
   androidRepo: "https://github.com/chenkor/sec-android",
   androidReleases: "https://github.com/chenkor/sec-android/releases",
   desktopRepo: "https://github.com/chenkor/sec-desktop",
-  /** Fallback until GitHub live data loads */
-  fallbackVersion: "1.0.0-beta.10",
-  fallbackApk:
-    "https://github.com/chenkor/sec-android/releases/download/v1.0.0-beta.10/SEC-v1.0.0-beta.10.apk",
+  /** Pushed by Android releases — one line, e.g. SEC-v1.0.0-beta.13 */
+  versionRawUrl:
+    "https://raw.githubusercontent.com/chenkor/sec-android/main/VERSION",
 } as const;
+
+/** APK + release tag share this label (from VERSION file). */
+export function apkUrlFromVersionLabel(label: string): string {
+  const v = label.trim();
+  if (!v) return SITE.androidReleases;
+  const enc = encodeURIComponent(v);
+  return `https://github.com/chenkor/sec-android/releases/download/${enc}/${enc}.apk`;
+}
 
 export const NAV = [
   { href: "/", label: "Home" },

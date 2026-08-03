@@ -1,4 +1,10 @@
+import baked from "@/lib/release.generated.json";
+import { SITE, apkUrlFromVersionLabel } from "@/lib/site";
+
 export type SecLiveData = {
+  /** Exact VERSION file contents, e.g. SEC-v1.0.0-beta.13 */
+  versionLabel: string;
+  /** Semver without SEC-v prefix */
   version: string;
   tag: string;
   apkUrl: string;
@@ -31,68 +37,120 @@ type GhRepo = {
   pushed_at?: string;
 };
 
-function pickApk(release: GhRelease) {
-  const assets = release.assets ?? [];
-  const apk =
-    assets.find((a) => a.name?.toLowerCase().endsWith(".apk")) ??
-    assets.find((a) => a.content_type?.includes("android")) ??
-    assets[0];
-  return apk ?? null;
+function normalizeSemver(label: string) {
+  return label.trim().replace(/^SEC-v/i, "").replace(/^v/i, "");
+}
+
+function fromVersionLabel(label: string, extra: Partial<SecLiveData> = {}): SecLiveData {
+  const versionLabel = label.trim();
+  const version = normalizeSemver(versionLabel);
+  return {
+    versionLabel,
+    version,
+    tag: versionLabel,
+    apkUrl: apkUrlFromVersionLabel(versionLabel),
+    apkName: `${versionLabel}.apk`,
+    apkBytes: null,
+    publishedAt: null,
+    stars: 0,
+    forks: 0,
+    openIssues: 0,
+    pushedAt: null,
+    fetchedAt: new Date().toISOString(),
+    ...extra,
+  };
+}
+
+/** Build-time snapshot from VERSION (+ optional API). */
+export function getBakedRelease(): SecLiveData {
+  const b = baked as Partial<SecLiveData> & { versionLabel?: string; version?: string };
+  const label = (b.versionLabel || b.tag || "").trim();
+  if (label) {
+    return fromVersionLabel(label, {
+      apkBytes: typeof b.apkBytes === "number" ? b.apkBytes : null,
+      publishedAt: b.publishedAt ?? null,
+      stars: b.stars ?? 0,
+      forks: b.forks ?? 0,
+      openIssues: b.openIssues ?? 0,
+      pushedAt: b.pushedAt ?? null,
+      fetchedAt: b.fetchedAt ?? new Date(0).toISOString(),
+    });
+  }
+  return fromVersionLabel("SEC-v0.0.0", {
+    fetchedAt: new Date(0).toISOString(),
+  });
+}
+
+/** Read the VERSION file from GitHub raw (or fail). */
+export async function fetchVersionLabel(): Promise<string> {
+  // bust CDN/browser cache — VERSION is tiny and must stay fresh
+  const url = `${SITE.versionRawUrl}?t=${Date.now()}`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { Accept: "text/plain" },
+  });
+  if (!res.ok) {
+    throw new Error(`VERSION HTTP ${res.status}`);
+  }
+  const text = (await res.text()).trim().split(/\r?\n/)[0]?.trim() ?? "";
+  if (!text) throw new Error("VERSION file empty");
+  return text;
 }
 
 export async function fetchSecLiveData(): Promise<SecLiveData> {
-  const headers: HeadersInit = {
-    Accept: "application/vnd.github+json",
-  };
+  const versionLabel = await fetchVersionLabel();
+  const base = fromVersionLabel(versionLabel);
 
-  const [releaseRes, repoRes] = await Promise.all([
-    // /releases/latest ignores prereleases; SEC ships betas as prerelease.
-    fetch(
-      "https://api.github.com/repos/chenkor/sec-android/releases?per_page=10",
-      { headers, cache: "no-store" },
-    ),
-    fetch("https://api.github.com/repos/chenkor/sec-android", {
-      headers,
-      cache: "no-store",
-    }),
-  ]);
+  // Best-effort extras from the API (stars, APK size). Never blocks VERSION-based download.
+  try {
+    const headers: HeadersInit = { Accept: "application/vnd.github+json" };
+    const [releaseRes, repoRes] = await Promise.all([
+      fetch(
+        `https://api.github.com/repos/chenkor/sec-android/releases/tags/${encodeURIComponent(versionLabel)}`,
+        { headers, cache: "no-store" },
+      ),
+      fetch("https://api.github.com/repos/chenkor/sec-android", {
+        headers,
+        cache: "no-store",
+      }),
+    ]);
 
-  if (!releaseRes.ok) {
-    throw new Error(`GitHub release HTTP ${releaseRes.status}`);
+    let apkBytes: number | null = null;
+    let publishedAt: string | null = null;
+    if (releaseRes.ok) {
+      const release = (await releaseRes.json()) as GhRelease;
+      publishedAt = release.published_at ?? null;
+      const apk =
+        release.assets?.find((a) => a.name === `${versionLabel}.apk`) ??
+        release.assets?.find((a) => a.name?.toLowerCase().endsWith(".apk"));
+      if (typeof apk?.size === "number") apkBytes = apk.size;
+    }
+
+    let stars = 0;
+    let forks = 0;
+    let openIssues = 0;
+    let pushedAt: string | null = null;
+    if (repoRes.ok) {
+      const repo = (await repoRes.json()) as GhRepo;
+      stars = repo.stargazers_count ?? 0;
+      forks = repo.forks_count ?? 0;
+      openIssues = repo.open_issues_count ?? 0;
+      pushedAt = repo.pushed_at ?? null;
+    }
+
+    return {
+      ...base,
+      apkBytes,
+      publishedAt,
+      stars,
+      forks,
+      openIssues,
+      pushedAt,
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch {
+    return base;
   }
-  if (!repoRes.ok) {
-    throw new Error(`GitHub repo HTTP ${repoRes.status}`);
-  }
-
-  const releases = (await releaseRes.json()) as GhRelease[];
-  const release =
-    releases.find((r) => !r.draft && pickApk(r)) ??
-    releases.find((r) => !r.draft) ??
-    null;
-  if (!release) {
-    throw new Error("No published GitHub release found");
-  }
-
-  const repo = (await repoRes.json()) as GhRepo;
-  const apk = pickApk(release);
-  const tag = release.tag_name ?? "v0.0.0";
-  const version = tag.replace(/^v/i, "");
-
-  return {
-    version,
-    tag,
-    apkUrl:
-      apk?.browser_download_url ??
-      `https://github.com/chenkor/sec-android/releases/tag/${encodeURIComponent(tag)}`,
-    apkName: apk?.name ?? `SEC-${version}.apk`,
-    apkBytes: typeof apk?.size === "number" ? apk.size : null,
-    publishedAt: release.published_at ?? null,
-    stars: repo.stargazers_count ?? 0,
-    forks: repo.forks_count ?? 0,
-    openIssues: repo.open_issues_count ?? 0,
-    pushedAt: repo.pushed_at ?? null,
-    fetchedAt: new Date().toISOString(),
-  };
 }
 
 export function formatBytes(bytes: number): string {

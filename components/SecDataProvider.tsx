@@ -9,8 +9,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { fetchSecLiveData, type SecLiveData } from "@/lib/github";
-import { SITE } from "@/lib/site";
+import {
+  fetchSecLiveData,
+  getBakedRelease,
+  type SecLiveData,
+} from "@/lib/github";
 
 type SecState = {
   data: SecLiveData | null;
@@ -24,22 +27,9 @@ type SecState = {
 
 const SecContext = createContext<SecState | null>(null);
 
-const FALLBACK: SecLiveData = {
-  version: SITE.fallbackVersion,
-  tag: `v${SITE.fallbackVersion}`,
-  apkUrl: SITE.fallbackApk,
-  apkName: `SEC-v${SITE.fallbackVersion}.apk`,
-  apkBytes: null,
-  publishedAt: null,
-  stars: 0,
-  forks: 0,
-  openIssues: 0,
-  pushedAt: null,
-  fetchedAt: new Date(0).toISOString(),
-};
-
 export function SecDataProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<SecLiveData | null>(null);
+  const baked = useMemo(() => getBakedRelease(), []);
+  const [data, setData] = useState<SecLiveData | null>(baked);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +52,7 @@ export function SecDataProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const value = useMemo<SecState>(() => {
-    const live = data ?? FALLBACK;
+    const live = data ?? baked;
     return {
       data,
       loading,
@@ -70,11 +60,9 @@ export function SecDataProvider({ children }: { children: ReactNode }) {
       refresh: () => void load(),
       apkUrl: live.apkUrl,
       version: live.version,
-      versionLabel: live.version.startsWith("v")
-        ? live.version
-        : `v${live.version}`,
+      versionLabel: live.versionLabel,
     };
-  }, [data, loading, error, load]);
+  }, [data, baked, loading, error, load]);
 
   return <SecContext.Provider value={value}>{children}</SecContext.Provider>;
 }
