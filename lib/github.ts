@@ -61,6 +61,10 @@ function fromVersionLabel(label: string, extra: Partial<SecLiveData> = {}): SecL
   };
 }
 
+function sameRelease(a: string, b: string) {
+  return normalizeSemver(a) === normalizeSemver(b);
+}
+
 /** Build-time snapshot from VERSION (+ optional API). */
 export function getBakedRelease(): SecLiveData {
   const b = baked as Partial<SecLiveData> & { versionLabel?: string; version?: string };
@@ -83,7 +87,6 @@ export function getBakedRelease(): SecLiveData {
 
 /** Read the VERSION file from GitHub raw (or fail). */
 export async function fetchVersionLabel(): Promise<string> {
-  // bust CDN/browser cache — VERSION is tiny and must stay fresh
   const url = `${SITE.versionRawUrl}?t=${Date.now()}`;
   const res = await fetch(url, {
     cache: "no-store",
@@ -97,11 +100,28 @@ export async function fetchVersionLabel(): Promise<string> {
   return text;
 }
 
+/**
+ * Live VERSION for the download URL + best-effort GitHub extras.
+ * If the API is rate-limited, keep build-time stats for the same release
+ * instead of wiping them to zeros / null.
+ */
 export async function fetchSecLiveData(): Promise<SecLiveData> {
+  const bakedSnap = getBakedRelease();
   const versionLabel = await fetchVersionLabel();
-  const base = fromVersionLabel(versionLabel);
 
-  // Best-effort extras from the API (stars, APK size). Never blocks VERSION-based download.
+  const fallbackExtras = sameRelease(versionLabel, bakedSnap.versionLabel)
+    ? {
+        apkBytes: bakedSnap.apkBytes,
+        publishedAt: bakedSnap.publishedAt,
+        stars: bakedSnap.stars,
+        forks: bakedSnap.forks,
+        openIssues: bakedSnap.openIssues,
+        pushedAt: bakedSnap.pushedAt,
+      }
+    : {};
+
+  const base = fromVersionLabel(versionLabel, fallbackExtras);
+
   try {
     const headers: HeadersInit = { Accept: "application/vnd.github+json" };
     const [releaseRes, repoRes] = await Promise.all([
@@ -115,27 +135,27 @@ export async function fetchSecLiveData(): Promise<SecLiveData> {
       }),
     ]);
 
-    let apkBytes: number | null = null;
-    let publishedAt: string | null = null;
+    let apkBytes = base.apkBytes;
+    let publishedAt = base.publishedAt;
     if (releaseRes.ok) {
       const release = (await releaseRes.json()) as GhRelease;
-      publishedAt = release.published_at ?? null;
+      publishedAt = release.published_at ?? publishedAt;
       const apk =
         release.assets?.find((a) => a.name === `${versionLabel}.apk`) ??
         release.assets?.find((a) => a.name?.toLowerCase().endsWith(".apk"));
       if (typeof apk?.size === "number") apkBytes = apk.size;
     }
 
-    let stars = 0;
-    let forks = 0;
-    let openIssues = 0;
-    let pushedAt: string | null = null;
+    let stars = base.stars;
+    let forks = base.forks;
+    let openIssues = base.openIssues;
+    let pushedAt = base.pushedAt;
     if (repoRes.ok) {
       const repo = (await repoRes.json()) as GhRepo;
-      stars = repo.stargazers_count ?? 0;
-      forks = repo.forks_count ?? 0;
-      openIssues = repo.open_issues_count ?? 0;
-      pushedAt = repo.pushed_at ?? null;
+      stars = repo.stargazers_count ?? stars;
+      forks = repo.forks_count ?? forks;
+      openIssues = repo.open_issues_count ?? openIssues;
+      pushedAt = repo.pushed_at ?? pushedAt;
     }
 
     return {
