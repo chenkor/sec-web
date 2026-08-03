@@ -2,7 +2,7 @@ import baked from "@/lib/release.generated.json";
 import { SITE, apkUrlFromVersionLabel } from "@/lib/site";
 
 export type SecLiveData = {
-  /** Exact VERSION file contents, e.g. SEC-v1.0.0-beta.13 */
+  /** Exact VERSION file contents, e.g. SEC-v1.0.0-beta.12 */
   versionLabel: string;
   /** Semver without SEC-v prefix */
   version: string;
