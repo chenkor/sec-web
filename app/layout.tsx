@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     images: [
       {
         // bump ?v= when regenerating so Discord/Slack drop cached mush
-        url: "/og.png?v=2",
+        url: "/og.png?v=3",
         width: 1200,
         height: 630,
         alt: "SEC - private messaging with a local vault",
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SEC",
     description: SITE.description,
-    images: ["/og.png?v=2"],
+    images: ["/og.png?v=3"],
   },
 };
 

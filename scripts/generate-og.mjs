@@ -1,5 +1,6 @@
 /**
- * Crisp 1200×630 OG image via next/og (Satori + resvg).
+ * Full-bleed 1200×630 OG image for Discord / Twitter.
+ * Renders at 2× then downscales for sharp text in embeds.
  * Usage: node scripts/generate-og.mjs
  */
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
@@ -13,6 +14,7 @@ const require = createRequire(import.meta.url);
 
 const W = 1200;
 const H = 630;
+const SCALE = 2;
 
 const ogPkg = join(root, "node_modules", "next", "dist", "compiled", "@vercel", "og");
 const { ImageResponse } = await import(pathToFileURL(join(ogPkg, "index.node.js")).href);
@@ -49,23 +51,26 @@ const element = {
       height: "100%",
       display: "flex",
       flexDirection: "column",
-      justifyContent: "space-between",
+      alignItems: "center",
+      justifyContent: "center",
       background: "#070707",
       color: "#f3f3f3",
-      padding: "56px 64px",
       position: "relative",
+      overflow: "hidden",
     },
     children: [
+      // full-bleed glows so the frame isn’t empty
       {
         type: "div",
         props: {
           style: {
             position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 6,
-            background: "#3dff9a",
+            left: -200,
+            top: -220,
+            width: 720,
+            height: 720,
+            background:
+              "radial-gradient(circle, rgba(61,255,154,0.20) 0%, rgba(61,255,154,0) 68%)",
           },
         },
       },
@@ -74,12 +79,25 @@ const element = {
         props: {
           style: {
             position: "absolute",
-            left: -80,
-            top: -120,
-            width: 520,
-            height: 420,
+            right: -180,
+            bottom: -260,
+            width: 680,
+            height: 680,
             background:
-              "radial-gradient(circle, rgba(61,255,154,0.18) 0%, rgba(61,255,154,0) 70%)",
+              "radial-gradient(circle, rgba(61,255,154,0.10) 0%, rgba(61,255,154,0) 70%)",
+          },
+        },
+      },
+      {
+        type: "div",
+        props: {
+          style: {
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 4,
+            background: "#3dff9a",
           },
         },
       },
@@ -89,20 +107,21 @@ const element = {
           style: {
             display: "flex",
             alignItems: "center",
-            gap: 14,
-            fontSize: 22,
-            letterSpacing: 4,
+            gap: 12,
+            fontSize: 20,
+            letterSpacing: 5,
             color: "#9a9a9a",
             fontFamily: "Instrument Sans",
             fontWeight: 600,
+            marginBottom: 28,
           },
           children: [
             {
               type: "div",
               props: {
                 style: {
-                  width: 12,
-                  height: 12,
+                  width: 10,
+                  height: 10,
                   borderRadius: 999,
                   background: "#3dff9a",
                 },
@@ -116,51 +135,44 @@ const element = {
         type: "div",
         props: {
           style: {
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            marginTop: 24,
+            fontSize: 168,
+            fontWeight: 700,
+            letterSpacing: -8,
+            lineHeight: 0.85,
+            color: "#f3f3f3",
+            fontFamily: "Syne",
+            textAlign: "center",
           },
-          children: [
-            {
-              type: "div",
-              props: {
-                style: {
-                  fontSize: 148,
-                  fontWeight: 700,
-                  letterSpacing: -6,
-                  lineHeight: 0.9,
-                  color: "#f3f3f3",
-                  fontFamily: "Syne",
-                },
-                children: "SEC",
-              },
-            },
-            {
-              type: "div",
-              props: {
-                style: {
-                  fontSize: 34,
-                  fontWeight: 600,
-                  color: "#c8c8c8",
-                  letterSpacing: -0.3,
-                  fontFamily: "Instrument Sans",
-                },
-                children: "Private messaging with a local vault.",
-              },
-            },
-          ],
+          children: "SEC",
         },
       },
       {
         type: "div",
         props: {
           style: {
+            marginTop: 28,
+            fontSize: 34,
+            fontWeight: 600,
+            color: "#d0d0d0",
+            fontFamily: "Instrument Sans",
+            textAlign: "center",
+            maxWidth: 900,
+          },
+          children: "Private messaging with a local vault.",
+        },
+      },
+      {
+        type: "div",
+        props: {
+          style: {
+            position: "absolute",
+            left: 56,
+            right: 56,
+            bottom: 40,
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "flex-end",
-            width: "100%",
-            fontSize: 24,
+            alignItems: "center",
+            fontSize: 22,
             fontFamily: "Instrument Sans",
             fontWeight: 600,
           },
@@ -169,7 +181,7 @@ const element = {
               type: "div",
               props: {
                 style: { color: "#7a7a7a" },
-                children: "Keys on your device. Optional Tor.",
+                children: "Keys on your device · Optional Tor",
               },
             },
             {
@@ -187,24 +199,30 @@ const element = {
 };
 
 const res = new ImageResponse(element, {
-  width: W,
-  height: H,
+  width: W * SCALE,
+  height: H * SCALE,
   fonts: [
     { name: "Syne", data: syne, weight: 700, style: "normal" },
     { name: "Instrument Sans", data: body, weight: 600, style: "normal" },
   ],
 });
 
-const png = Buffer.from(await res.arrayBuffer());
+const hi = Buffer.from(await res.arrayBuffer());
+const sharp = require("sharp");
+
+const png = await sharp(hi)
+  .resize(W, H, { fit: "fill", kernel: "lanczos3" })
+  .png({ compressionLevel: 8 })
+  .toBuffer();
+
+const jpg = await sharp(png)
+  .jpeg({ quality: 96, mozjpeg: true, chromaSubsampling: "4:4:4" })
+  .toBuffer();
+
 const outDir = join(root, "public");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "og.png"), png);
-
-const sharp = require("sharp");
-const jpg = await sharp(png)
-  .jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: "4:4:4" })
-  .toBuffer();
 writeFileSync(join(outDir, "og.jpg"), jpg);
 
-console.log(`[og] public/og.png (${png.length} bytes) ${W}x${H}`);
+console.log(`[og] public/og.png ${W}x${H} (${png.length} bytes)`);
 console.log(`[og] public/og.jpg (${jpg.length} bytes)`);
