@@ -1,0 +1,5 @@
+SEC
+----
+Initial work by chenkor (https://github.com/chenkor)
+
+The technology is free to use, fork, and change under the project license.
