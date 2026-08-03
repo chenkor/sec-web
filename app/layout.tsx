@@ -48,11 +48,20 @@ export const metadata: Metadata = {
     siteName: "SEC",
     locale: "en_US",
     type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "SEC - private messaging with a local vault",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "SEC",
     description: SITE.description,
+    images: ["/og.png"],
   },
 };
 
