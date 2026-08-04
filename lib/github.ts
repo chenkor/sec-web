@@ -100,30 +100,21 @@ export async function fetchVersionLabel(): Promise<string> {
   return text;
 }
 
-/**
- * Live VERSION for the download URL + best-effort GitHub extras.
- * If the API is rate-limited, keep build-time stats for the same release
- * instead of wiping them to zeros / null.
- */
-export async function fetchSecLiveData(): Promise<SecLiveData> {
-  const bakedSnap = getBakedRelease();
-  const versionLabel = await fetchVersionLabel();
+type LiveExtras = {
+  apkBytes: number | null;
+  publishedAt: string | null;
+  stars: number;
+  forks: number;
+  openIssues: number;
+  pushedAt: string | null;
+};
 
-  const fallbackExtras = sameRelease(versionLabel, bakedSnap.versionLabel)
-    ? {
-        apkBytes: bakedSnap.apkBytes,
-        publishedAt: bakedSnap.publishedAt,
-        stars: bakedSnap.stars,
-        forks: bakedSnap.forks,
-        openIssues: bakedSnap.openIssues,
-        pushedAt: bakedSnap.pushedAt,
-      }
-    : {};
-
-  const base = fromVersionLabel(versionLabel, fallbackExtras);
-
+async function extrasFromGithub(versionLabel: string): Promise<Partial<LiveExtras> | null> {
   try {
-    const headers: HeadersInit = { Accept: "application/vnd.github+json" };
+    const headers: HeadersInit = {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "sec-web",
+    };
     const [releaseRes, repoRes] = await Promise.all([
       fetch(
         `https://api.github.com/repos/chenkor/sec-android/releases/tags/${encodeURIComponent(versionLabel)}`,
@@ -135,42 +126,116 @@ export async function fetchSecLiveData(): Promise<SecLiveData> {
       }),
     ]);
 
-    let apkBytes = base.apkBytes;
-    let publishedAt = base.publishedAt;
+    // Rate-limit / auth failures must not look like "success with stale blanks".
+    if (!releaseRes.ok && !repoRes.ok) return null;
+
+    const out: Partial<LiveExtras> = {};
     if (releaseRes.ok) {
       const release = (await releaseRes.json()) as GhRelease;
-      publishedAt = release.published_at ?? publishedAt;
+      out.publishedAt = release.published_at ?? null;
       const apk =
         release.assets?.find((a) => a.name === `${versionLabel}.apk`) ??
         release.assets?.find((a) => a.name?.toLowerCase().endsWith(".apk"));
-      if (typeof apk?.size === "number") apkBytes = apk.size;
+      if (typeof apk?.size === "number") out.apkBytes = apk.size;
     }
-
-    let stars = base.stars;
-    let forks = base.forks;
-    let openIssues = base.openIssues;
-    let pushedAt = base.pushedAt;
     if (repoRes.ok) {
       const repo = (await repoRes.json()) as GhRepo;
-      stars = repo.stargazers_count ?? stars;
-      forks = repo.forks_count ?? forks;
-      openIssues = repo.open_issues_count ?? openIssues;
-      pushedAt = repo.pushed_at ?? pushedAt;
+      out.stars = repo.stargazers_count ?? 0;
+      out.forks = repo.forks_count ?? 0;
+      out.openIssues = repo.open_issues_count ?? 0;
+      out.pushedAt = repo.pushed_at ?? null;
     }
-
-    return {
-      ...base,
-      apkBytes,
-      publishedAt,
-      stars,
-      forks,
-      openIssues,
-      pushedAt,
-      fetchedAt: new Date().toISOString(),
-    };
+    return out;
   } catch {
-    return base;
+    return null;
   }
+}
+
+/** CORS-friendly mirror used when api.github.com is rate-limited. */
+async function extrasFromUngh(versionLabel: string): Promise<Partial<LiveExtras> | null> {
+  try {
+    const [repoRes, relRes] = await Promise.all([
+      fetch("https://ungh.cc/repos/chenkor/sec-android", { cache: "no-store" }),
+      fetch("https://ungh.cc/repos/chenkor/sec-android/releases/latest", {
+        cache: "no-store",
+      }),
+    ]);
+    if (!repoRes.ok && !relRes.ok) return null;
+
+    const out: Partial<LiveExtras> = {};
+    if (repoRes.ok) {
+      const body = (await repoRes.json()) as {
+        repo?: {
+          stars?: number;
+          forks?: number;
+          pushedAt?: string;
+        };
+      };
+      out.stars = body.repo?.stars ?? 0;
+      out.forks = body.repo?.forks ?? 0;
+      out.pushedAt = body.repo?.pushedAt ?? null;
+    }
+    if (relRes.ok) {
+      const body = (await relRes.json()) as {
+        release?: {
+          tag?: string;
+          publishedAt?: string;
+          assets?: Array<{ size?: number; downloadUrl?: string }>;
+        };
+      };
+      const release = body.release;
+      if (release && sameRelease(release.tag ?? "", versionLabel)) {
+        out.publishedAt = release.publishedAt ?? null;
+        const apk = release.assets?.find((a) =>
+          a.downloadUrl?.toLowerCase().endsWith(".apk"),
+        );
+        if (typeof apk?.size === "number") out.apkBytes = apk.size;
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Live VERSION for the download URL + best-effort repo extras.
+ * GitHub API first; ungh.cc if rate-limited; bake only as last resort
+ * for the same release (never wipe known stats to zeros).
+ */
+export async function fetchSecLiveData(): Promise<SecLiveData> {
+  const bakedSnap = getBakedRelease();
+  const versionLabel = await fetchVersionLabel();
+
+  const bakedExtras = sameRelease(versionLabel, bakedSnap.versionLabel)
+    ? {
+        apkBytes: bakedSnap.apkBytes,
+        publishedAt: bakedSnap.publishedAt,
+        stars: bakedSnap.stars,
+        forks: bakedSnap.forks,
+        openIssues: bakedSnap.openIssues,
+        pushedAt: bakedSnap.pushedAt,
+      }
+    : {};
+
+  const base = fromVersionLabel(versionLabel, bakedExtras);
+  const fromGh = await extrasFromGithub(versionLabel);
+  const needsMirror =
+    !fromGh || fromGh.pushedAt == null || fromGh.publishedAt == null;
+  const fromMirror = needsMirror ? await extrasFromUngh(versionLabel) : null;
+  // Bake < mirror < GitHub (only defined fields win via spread order + ?? below)
+  const extras = { ...bakedExtras, ...fromMirror, ...fromGh };
+
+  return {
+    ...base,
+    apkBytes: extras.apkBytes ?? base.apkBytes,
+    publishedAt: extras.publishedAt ?? base.publishedAt,
+    stars: extras.stars ?? base.stars,
+    forks: extras.forks ?? base.forks,
+    openIssues: extras.openIssues ?? base.openIssues,
+    pushedAt: extras.pushedAt ?? base.pushedAt,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export function formatBytes(bytes: number): string {

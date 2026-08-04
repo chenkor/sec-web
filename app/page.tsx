@@ -61,7 +61,7 @@ export default function HomePage() {
         <Row label="Released">
           <RelativeTime iso={live?.publishedAt ?? null} />
         </Row>
-        <Row label="Repo push">
+        <Row label="Android push">
           <RelativeTime iso={live?.pushedAt ?? null} />
         </Row>
         <Row label="Stars">

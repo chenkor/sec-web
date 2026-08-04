@@ -8,15 +8,15 @@ const posture = [
   },
   {
     title: "Sealed at rest",
-    body: "Data stays encrypted until you unlock. After a while idle, the app locks itself again.",
+    body: "Messages, contacts, voice, relays, and outbox are sealed with your vault key. An optional password gate helps if you don't trust the phone OS (Samsung and similar) — still not 100% OS-proof. Idle auto-lock on phone and desktop.",
   },
   {
     title: "Hardened egress",
-    body: "Cleartext HTTP is blocked. You can force Tor. Relay certificates can be pinned with TOFU.",
+    body: "Tor is on by default with no clearnet fallback. Per-relay SOCKS isolation on desktop. Bridges supported. Media and links fail closed off Tor.",
   },
   {
-    title: "Device hygiene",
-    body: "Where the OS allows it, SEC stays out of recents. Vault material is not backed up to Android cloud.",
+    title: "Panic and stealth",
+    body: "Duress password destroys the vault while looking like a wrong unlock. Android stealth launcher. Screenshots blocked where the OS allows.",
   },
 ];
 
@@ -26,7 +26,7 @@ export default function SecurityPage() {
       <PageHeader
         kicker="Security"
         title="Keep the channel yours."
-        lead="SEC is for private messaging when you don't want a platform account in the middle. Local keys, optional Tor, Bluetooth when the network is gone."
+        lead="Local keys. Tor by default. Sealed until unlock. Panic wipe when you need it. No platform account in the middle."
       />
 
       <NetworkDiagram />
@@ -42,10 +42,11 @@ export default function SecurityPage() {
 
       <div className="panel mt-4 max-w-3xl">
         <p className="panel-body !mt-0">
-          Your keys never leave the device. Messages stay sealed end to end.
-          Force Tor when you need the path hidden, pin relays with TOFU, and
-          keep talking over Bluetooth when IP is dead. No platform account in
-          the middle — privacy by possession, not by promise.
+          Locked means sealed. Tor hides the path when you leave it on. Bluetooth
+          has no branded name tag. Kind 0 profiles stay local unless you publish.
+          A password gate is optional — useful on untrusted OEM phones, never a
+          claim that the app beats a compromised OS. No platform can hand over
+          what it never held.
         </p>
       </div>
     </div>

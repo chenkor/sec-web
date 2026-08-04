@@ -42,9 +42,9 @@ function scene(m: Mode) {
     body =
       "Same public relays, but the phone reaches them through Tor. If Tor fails and Tor only is off, SEC can fall back to a normal connection.";
   } else if (btStandby) {
-    title = "Internet path active · Bluetooth on standby";
+    title = "Clearnet path · Bluetooth on standby";
     body =
-      "Messages use relays over the internet. Bluetooth is armed for the moment the network disappears — that’s the Android fallback.";
+      "Relays over a normal connection (Tor off). Bluetooth is armed for when the network disappears — that’s the Android fallback.";
   }
 
   return { online, viaTor, viaNet, btLive, btStandby, stuck, title, body };
