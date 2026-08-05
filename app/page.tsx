@@ -47,7 +47,7 @@ export default function HomePage() {
       </div>
 
       <aside className="home__aside" aria-label="Live release and time">
-        <Row label="Timezone">
+        <Row label="Time now">
           <LiveClock />
         </Row>
         <Row label="Version">
@@ -59,7 +59,7 @@ export default function HomePage() {
           </span>
         </Row>
         <Row label="Released">
-          <RelativeTime iso={live?.publishedAt ?? null} />
+          <RelativeTime iso={live?.firstReleaseAt ?? null} />
         </Row>
         <Row label="Android push">
           <RelativeTime iso={live?.pushedAt ?? null} />

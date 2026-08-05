@@ -11,6 +11,8 @@ export type SecLiveData = {
   apkName: string;
   apkBytes: number | null;
   publishedAt: string | null;
+  /** Oldest release of the project (repo creation as fallback) */
+  firstReleaseAt: string | null;
   stars: number;
   forks: number;
   openIssues: number;
@@ -21,6 +23,7 @@ export type SecLiveData = {
 type GhRelease = {
   tag_name?: string;
   published_at?: string;
+  created_at?: string;
   draft?: boolean;
   assets?: Array<{
     name?: string;
@@ -35,6 +38,7 @@ type GhRepo = {
   forks_count?: number;
   open_issues_count?: number;
   pushed_at?: string;
+  created_at?: string;
 };
 
 function normalizeSemver(label: string) {
@@ -52,6 +56,7 @@ function fromVersionLabel(label: string, extra: Partial<SecLiveData> = {}): SecL
     apkName: `${versionLabel}.apk`,
     apkBytes: null,
     publishedAt: null,
+    firstReleaseAt: null,
     stars: 0,
     forks: 0,
     openIssues: 0,
@@ -65,6 +70,17 @@ function sameRelease(a: string, b: string) {
   return normalizeSemver(a) === normalizeSemver(b);
 }
 
+function oldestIso(dates: Array<string | null | undefined>): string | null {
+  let best: { iso: string; ms: number } | null = null;
+  for (const iso of dates) {
+    if (!iso) continue;
+    const ms = Date.parse(iso);
+    if (Number.isNaN(ms)) continue;
+    if (!best || ms < best.ms) best = { iso, ms };
+  }
+  return best?.iso ?? null;
+}
+
 /** Build-time snapshot from VERSION (+ optional API). */
 export function getBakedRelease(): SecLiveData {
   const b = baked as Partial<SecLiveData> & { versionLabel?: string; version?: string };
@@ -73,6 +89,7 @@ export function getBakedRelease(): SecLiveData {
     return fromVersionLabel(label, {
       apkBytes: typeof b.apkBytes === "number" ? b.apkBytes : null,
       publishedAt: b.publishedAt ?? null,
+      firstReleaseAt: b.firstReleaseAt ?? null,
       stars: b.stars ?? 0,
       forks: b.forks ?? 0,
       openIssues: b.openIssues ?? 0,
@@ -103,6 +120,7 @@ export async function fetchVersionLabel(): Promise<string> {
 type LiveExtras = {
   apkBytes: number | null;
   publishedAt: string | null;
+  firstReleaseAt: string | null;
   stars: number;
   forks: number;
   openIssues: number;
@@ -115,7 +133,7 @@ async function extrasFromGithub(versionLabel: string): Promise<Partial<LiveExtra
       Accept: "application/vnd.github+json",
       "User-Agent": "sec-web",
     };
-    const [releaseRes, repoRes] = await Promise.all([
+    const [releaseRes, repoRes, listRes] = await Promise.all([
       fetch(
         `https://api.github.com/repos/chenkor/sec-android/releases/tags/${encodeURIComponent(versionLabel)}`,
         { headers, cache: "no-store" },
@@ -124,10 +142,14 @@ async function extrasFromGithub(versionLabel: string): Promise<Partial<LiveExtra
         headers,
         cache: "no-store",
       }),
+      fetch(
+        "https://api.github.com/repos/chenkor/sec-android/releases?per_page=100",
+        { headers, cache: "no-store" },
+      ),
     ]);
 
     // Rate-limit / auth failures must not look like "success with stale blanks".
-    if (!releaseRes.ok && !repoRes.ok) return null;
+    if (!releaseRes.ok && !repoRes.ok && !listRes.ok) return null;
 
     const out: Partial<LiveExtras> = {};
     if (releaseRes.ok) {
@@ -138,12 +160,24 @@ async function extrasFromGithub(versionLabel: string): Promise<Partial<LiveExtra
         release.assets?.find((a) => a.name?.toLowerCase().endsWith(".apk"));
       if (typeof apk?.size === "number") out.apkBytes = apk.size;
     }
+    let repoCreatedAt: string | null = null;
     if (repoRes.ok) {
       const repo = (await repoRes.json()) as GhRepo;
       out.stars = repo.stargazers_count ?? 0;
       out.forks = repo.forks_count ?? 0;
       out.openIssues = repo.open_issues_count ?? 0;
       out.pushedAt = repo.pushed_at ?? null;
+      repoCreatedAt = repo.created_at ?? null;
+    }
+    if (listRes.ok) {
+      const list = (await listRes.json()) as GhRelease[];
+      const oldestRelease = Array.isArray(list)
+        ? oldestIso(list.map((r) => r.published_at ?? r.created_at))
+        : null;
+      const first = oldestRelease ?? repoCreatedAt;
+      if (first) out.firstReleaseAt = first;
+    } else if (repoCreatedAt) {
+      out.firstReleaseAt = repoCreatedAt;
     }
     return out;
   } catch {
@@ -154,26 +188,43 @@ async function extrasFromGithub(versionLabel: string): Promise<Partial<LiveExtra
 /** CORS-friendly mirror used when api.github.com is rate-limited. */
 async function extrasFromUngh(versionLabel: string): Promise<Partial<LiveExtras> | null> {
   try {
-    const [repoRes, relRes] = await Promise.all([
+    const [repoRes, relRes, listRes] = await Promise.all([
       fetch("https://ungh.cc/repos/chenkor/sec-android", { cache: "no-store" }),
       fetch("https://ungh.cc/repos/chenkor/sec-android/releases/latest", {
         cache: "no-store",
       }),
+      fetch("https://ungh.cc/repos/chenkor/sec-android/releases", {
+        cache: "no-store",
+      }),
     ]);
-    if (!repoRes.ok && !relRes.ok) return null;
+    if (!repoRes.ok && !relRes.ok && !listRes.ok) return null;
 
     const out: Partial<LiveExtras> = {};
+    let repoCreatedAt: string | null = null;
     if (repoRes.ok) {
       const body = (await repoRes.json()) as {
         repo?: {
           stars?: number;
           forks?: number;
           pushedAt?: string;
+          createdAt?: string;
         };
       };
       out.stars = body.repo?.stars ?? 0;
       out.forks = body.repo?.forks ?? 0;
       out.pushedAt = body.repo?.pushedAt ?? null;
+      repoCreatedAt = body.repo?.createdAt ?? null;
+    }
+    if (listRes.ok) {
+      const body = (await listRes.json()) as {
+        releases?: Array<{ publishedAt?: string }>;
+      };
+      const first =
+        oldestIso((body.releases ?? []).map((r) => r.publishedAt)) ??
+        repoCreatedAt;
+      if (first) out.firstReleaseAt = first;
+    } else if (repoCreatedAt) {
+      out.firstReleaseAt = repoCreatedAt;
     }
     if (relRes.ok) {
       const body = (await relRes.json()) as {
@@ -211,17 +262,21 @@ export async function fetchSecLiveData(): Promise<SecLiveData> {
     ? {
         apkBytes: bakedSnap.apkBytes,
         publishedAt: bakedSnap.publishedAt,
+        firstReleaseAt: bakedSnap.firstReleaseAt,
         stars: bakedSnap.stars,
         forks: bakedSnap.forks,
         openIssues: bakedSnap.openIssues,
         pushedAt: bakedSnap.pushedAt,
       }
-    : {};
+    : { firstReleaseAt: bakedSnap.firstReleaseAt };
 
   const base = fromVersionLabel(versionLabel, bakedExtras);
   const fromGh = await extrasFromGithub(versionLabel);
   const needsMirror =
-    !fromGh || fromGh.pushedAt == null || fromGh.publishedAt == null;
+    !fromGh ||
+    fromGh.pushedAt == null ||
+    fromGh.publishedAt == null ||
+    fromGh.firstReleaseAt == null;
   const fromMirror = needsMirror ? await extrasFromUngh(versionLabel) : null;
   // Bake < mirror < GitHub (only defined fields win via spread order + ?? below)
   const extras = { ...bakedExtras, ...fromMirror, ...fromGh };
@@ -230,6 +285,7 @@ export async function fetchSecLiveData(): Promise<SecLiveData> {
     ...base,
     apkBytes: extras.apkBytes ?? base.apkBytes,
     publishedAt: extras.publishedAt ?? base.publishedAt,
+    firstReleaseAt: extras.firstReleaseAt ?? base.firstReleaseAt,
     stars: extras.stars ?? base.stars,
     forks: extras.forks ?? base.forks,
     openIssues: extras.openIssues ?? base.openIssues,

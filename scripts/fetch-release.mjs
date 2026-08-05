@@ -8,8 +8,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outPath = join(__dirname, ".", "lib", "release.generated.json");
-const localVersion = join(__dirname, ".", ".", "sec-android", "VERSION");
+const outPath = join(__dirname, "..", "lib", "release.generated.json");
+const localVersion = join(__dirname, "..", "..", "sec-android", "VERSION");
 const remoteVersion =
   "https://raw.githubusercontent.com/chenkor/sec-android/main/VERSION";
 
@@ -42,7 +42,23 @@ async function readVersionLabel() {
   return t;
 }
 
-async function extras(label) {
+function oldestIso(values) {
+  const stamps = values
+    .filter((s) => typeof s === "string" && !Number.isNaN(Date.parse(s)))
+    .sort((a, b) => Date.parse(a) - Date.parse(b));
+  return stamps[0] ?? null;
+}
+
+/** Previous snapshot, so a rate-limited build never downgrades to nulls. */
+function previousSnapshot() {
+  try {
+    return JSON.parse(readFileSync(outPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+async function extrasFromGithub(label) {
   const headers = {
     Accept: "application/vnd.github+json",
     "User-Agent": "sec-web-build",
@@ -51,13 +67,19 @@ async function extras(label) {
     headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   }
   try {
-    const [relRes, repoRes] = await Promise.all([
+    const [relRes, repoRes, listRes] = await Promise.all([
       fetch(
         `https://api.github.com/repos/chenkor/sec-android/releases/tags/${encodeURIComponent(label)}`,
         { headers },
       ),
       fetch("https://api.github.com/repos/chenkor/sec-android", { headers }),
+      fetch(
+        "https://api.github.com/repos/chenkor/sec-android/releases?per_page=100",
+        { headers },
+      ),
     ]);
+    if (!relRes.ok && !repoRes.ok && !listRes.ok) return null;
+
     let apkBytes = null;
     let publishedAt = null;
     if (relRes.ok) {
@@ -68,28 +90,115 @@ async function extras(label) {
         (release.assets ?? []).find((a) => a.name?.endsWith(".apk"));
       if (typeof apk?.size === "number") apkBytes = apk.size;
     }
-    let stars = 0;
-    let forks = 0;
-    let openIssues = 0;
+    let stars = null;
+    let forks = null;
+    let openIssues = null;
     let pushedAt = null;
+    let createdAt = null;
     if (repoRes.ok) {
       const repo = await repoRes.json();
-      stars = repo.stargazers_count ?? 0;
-      forks = repo.forks_count ?? 0;
-      openIssues = repo.open_issues_count ?? 0;
+      stars = repo.stargazers_count ?? null;
+      forks = repo.forks_count ?? null;
+      openIssues = repo.open_issues_count ?? null;
       pushedAt = repo.pushed_at ?? null;
+      createdAt = repo.created_at ?? null;
     }
-    return { apkBytes, publishedAt, stars, forks, openIssues, pushedAt };
-  } catch {
+    let firstReleaseAt = createdAt;
+    if (listRes.ok) {
+      const list = await listRes.json();
+      firstReleaseAt =
+        oldestIso(
+          (Array.isArray(list) ? list : []).map(
+            (r) => r.published_at ?? r.created_at,
+          ),
+        ) ?? createdAt;
+    }
     return {
-      apkBytes: null,
-      publishedAt: null,
-      stars: 0,
-      forks: 0,
-      openIssues: 0,
-      pushedAt: null,
+      apkBytes,
+      publishedAt,
+      firstReleaseAt,
+      stars,
+      forks,
+      openIssues,
+      pushedAt,
     };
+  } catch {
+    return null;
   }
+}
+
+/** CORS-free mirror, used when api.github.com rate-limits the build. */
+async function extrasFromUngh(label) {
+  try {
+    const [repoRes, listRes, latestRes] = await Promise.all([
+      fetch("https://ungh.cc/repos/chenkor/sec-android"),
+      fetch("https://ungh.cc/repos/chenkor/sec-android/releases"),
+      fetch("https://ungh.cc/repos/chenkor/sec-android/releases/latest"),
+    ]);
+    if (!repoRes.ok && !listRes.ok && !latestRes.ok) return null;
+
+    let stars = null;
+    let forks = null;
+    let pushedAt = null;
+    let createdAt = null;
+    if (repoRes.ok) {
+      const { repo } = await repoRes.json();
+      stars = repo?.stars ?? null;
+      forks = repo?.forks ?? null;
+      pushedAt = repo?.pushedAt ?? null;
+      createdAt = repo?.createdAt ?? null;
+    }
+    let firstReleaseAt = createdAt;
+    if (listRes.ok) {
+      const { releases } = await listRes.json();
+      firstReleaseAt =
+        oldestIso((releases ?? []).map((r) => r.publishedAt)) ?? createdAt;
+    }
+    let apkBytes = null;
+    let publishedAt = null;
+    if (latestRes.ok) {
+      const { release } = await latestRes.json();
+      if (release && semver(release.tag ?? "") === semver(label)) {
+        publishedAt = release.publishedAt ?? null;
+        const apk = (release.assets ?? []).find((a) =>
+          a.downloadUrl?.toLowerCase().endsWith(".apk"),
+        );
+        if (typeof apk?.size === "number") apkBytes = apk.size;
+      }
+    }
+    return { apkBytes, publishedAt, firstReleaseAt, stars, forks, pushedAt };
+  } catch {
+    return null;
+  }
+}
+
+async function extras(label) {
+  const prev = previousSnapshot();
+  const gh = await extrasFromGithub(label);
+  const needsMirror =
+    !gh ||
+    gh.firstReleaseAt == null ||
+    gh.publishedAt == null ||
+    gh.pushedAt == null;
+  const mirror = needsMirror ? await extrasFromUngh(label) : null;
+  if (!gh && !mirror) console.warn("[fetch-release] stats unavailable");
+
+  // Release-specific leftovers only apply to the same release.
+  const sameRelease = semver(prev?.versionLabel ?? "") === semver(label);
+  const pick = (key, fallback) =>
+    gh?.[key] ?? mirror?.[key] ?? prev?.[key] ?? fallback;
+  const pickRelease = (key) =>
+    gh?.[key] ?? mirror?.[key] ?? (sameRelease ? prev?.[key] : null) ?? null;
+
+  return {
+    apkBytes: pickRelease("apkBytes"),
+    publishedAt: pickRelease("publishedAt"),
+    firstReleaseAt: pick("firstReleaseAt", null),
+    stars: pick("stars", 0),
+    forks: pick("forks", 0),
+    openIssues: pick("openIssues", 0),
+    pushedAt: pick("pushedAt", null),
+  };
 }
 
 async function main() {
@@ -119,6 +228,7 @@ main().catch((err) => {
     apkName: "SEC-v0.0.0.apk",
     apkBytes: null,
     publishedAt: null,
+    firstReleaseAt: null,
     stars: 0,
     forks: 0,
     openIssues: 0,
