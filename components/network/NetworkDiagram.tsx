@@ -26,7 +26,7 @@ function scene(m: Mode) {
     body =
       "No internet and no Bluetooth, so the message stays on the device until a path opens again.";
   } else if (btLive) {
-    title = "Internet down — phones link over Bluetooth";
+    title = "Internet down: phones link over Bluetooth";
     body =
       "When Wi‑Fi and mobile data are gone, SEC switches to a nearby Bluetooth path. Relays are out of reach; phones pass the encrypted message directly.";
   } else if (viaTor && m.torOnly) {
@@ -36,7 +36,7 @@ function scene(m: Mode) {
   } else if (viaTor && btStandby) {
     title = "Tor to the relays · Bluetooth on standby";
     body =
-      "Traffic to relays goes through Tor. Bluetooth stays ready for when the network drops — turn Internet off to see that handoff.";
+      "Traffic to relays goes through Tor. Bluetooth stays ready for when the network drops. Turn Internet off to see that handoff.";
   } else if (viaTor) {
     title = "Relays through Tor";
     body =
@@ -44,7 +44,7 @@ function scene(m: Mode) {
   } else if (btStandby) {
     title = "Clearnet path · Bluetooth on standby";
     body =
-      "Relays over a normal connection (Tor off). Bluetooth is armed for when the network disappears — that’s the Android fallback.";
+      "Relays over a normal connection (Tor off). Bluetooth is armed for when the network disappears. That’s the Android fallback.";
   }
 
   return { online, viaTor, viaNet, btLive, btStandby, stuck, title, body };
@@ -140,7 +140,7 @@ export function NetworkDiagram() {
       : "Relays";
 
   const relaySub = !s.online
-    ? "Offline — unreachable"
+    ? "Offline: unreachable"
     : s.viaTor
       ? mode.torOnly
         ? "Can’t read messages · no direct backup"
@@ -273,7 +273,7 @@ export function NetworkDiagram() {
             setMode((m) => ({
               ...m,
               bluetooth,
-              // Live Bluetooth means radios are down — Tor has nowhere to go.
+              // Live Bluetooth means radios are down. Tor has nowhere to go.
               ...(bluetooth && !m.internet
                 ? { tor: false, torOnly: false }
                 : {}),

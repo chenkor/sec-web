@@ -1,6 +1,6 @@
 /**
  * Bake VERSION (+ optional GitHub extras) at build time.
- * Prefers local ../sec-android/VERSION when building from the sec monorepo,
+ * Prefers local./sec-android/VERSION when building from the sec monorepo,
  * else raw.githubusercontent.com/chenkor/sec-android/main/VERSION.
  */
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
@@ -8,8 +8,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outPath = join(__dirname, "..", "lib", "release.generated.json");
-const localVersion = join(__dirname, "..", "..", "sec-android", "VERSION");
+const outPath = join(__dirname, ".", "lib", "release.generated.json");
+const localVersion = join(__dirname, ".", ".", "sec-android", "VERSION");
 const remoteVersion =
   "https://raw.githubusercontent.com/chenkor/sec-android/main/VERSION";
 
@@ -101,7 +101,7 @@ async function main() {
     tag: versionLabel,
     apkUrl: apkUrlFromLabel(versionLabel),
     apkName: `${versionLabel}.apk`,
-    ...x,
+   ...x,
     fetchedAt: new Date().toISOString(),
   };
   mkdirSync(dirname(outPath), { recursive: true });
@@ -110,7 +110,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.warn(`[fetch-release] ${err.message} — writing stub`);
+  console.warn(`[fetch-release] ${err.message}. Writing stub`);
   const stub = {
     versionLabel: "SEC-v0.0.0",
     version: "0.0.0",

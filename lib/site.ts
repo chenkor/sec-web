@@ -7,7 +7,7 @@ export const SITE = {
   androidRepo: "https://github.com/chenkor/sec-android",
   androidReleases: "https://github.com/chenkor/sec-android/releases",
   desktopRepo: "https://github.com/chenkor/sec-desktop",
-  /** Pushed by Android releases — one line, e.g. SEC-v1.0.0-beta.12 */
+  /** Pushed by Android releases. One line, e.g. SEC-v1.0.0-beta.12 */
   versionRawUrl:
     "https://raw.githubusercontent.com/chenkor/sec-android/main/VERSION",
 } as const;

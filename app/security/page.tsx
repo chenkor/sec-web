@@ -8,7 +8,7 @@ const posture = [
   },
   {
     title: "Sealed at rest",
-    body: "Messages, contacts, voice, relays, and outbox are sealed with your vault key. An optional password gate helps if you don't trust the phone OS (Samsung and similar) — still not 100% OS-proof. Idle auto-lock on phone and desktop.",
+    body: "Messages, contacts, voice, relays, and outbox are sealed with your vault key. An optional password gate helps if you don't trust the phone OS (Samsung and similar). Still not 100% OS-proof. Idle auto-lock on phone and desktop.",
   },
   {
     title: "Hardened egress",
@@ -44,7 +44,7 @@ export default function SecurityPage() {
         <p className="panel-body !mt-0">
           Locked means sealed. Tor hides the path when you leave it on. Bluetooth
           has no branded name tag. Kind 0 profiles stay local unless you publish.
-          A password gate is optional — useful on untrusted OEM phones, never a
+          A password gate is optional. Useful on untrusted OEM phones, never a
           claim that the app beats a compromised OS. No platform can hand over
           what it never held.
         </p>
